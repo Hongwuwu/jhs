@@ -5,7 +5,7 @@ let saved;try{saved=JSON.parse(localStorage.getItem('together-v1'))}catch{}
 export const state=reactive(saved||initial());
 watch(state, persist, { deep: true });
 export function persist(){localStorage.setItem('together-v1',JSON.stringify(state))}
-export function reset(){Object.assign(state,initial());persist()}
+export function reset(){Object.assign(state,initial(),{profiles:{},friends:{},invites:[]});persist()}
 export const project=id=>state.projects.find(p=>p.id===Number(id));
 export const canEdit=t=>project(t.project)?.owner===state.user;
 export const visible=t=>canEdit(t)||t.people.includes(state.user);
@@ -13,3 +13,12 @@ export const progress=p=>{const tasks=state.tasks.filter(t=>t.project===p.id);re
 export const status=t=>t.progress===100?'已完成':t.end<new Date().toLocaleDateString('sv-SE')?'已逾期':t.progress?'进行中':'待开始';
 export function message(task,text){const t=state.tasks.find(t=>t.id===task);state.messages.unshift({id:Date.now(),task,from:state.user,to:[...new Set([project(t.project).owner,...t.people])].filter(x=>x!==state.user),text,time:new Date().toLocaleString('zh-CN'),read:false});persist()}
 export const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// 扩展数据兼容旧的本地演示记录。
+state.profiles ||= {}; state.friends ||= {}; state.invites ||= [];
+export const profile=(u=state.user)=>state.profiles[u]||{nickname:u,avatar:'',bio:''};
+export const displayName=u=>profile(u).nickname||u;
+export const load=u=>state.tasks.filter(t=>t.people.includes(u)&&t.progress<100).length;
+export function retract(m){if(m.from!==state.user||m.retracted)return;m.retracted=true;m.text='此留言已撤回';m.attachments=[]}
+export function invite(to,projectId){if(to===state.user)return '不能邀请自己';if(state.invites.some(i=>i.to===to&&i.project===projectId&&i.status==='待处理'))return '已经发出邀请';state.invites.push({id:Date.now(),from:state.user,to,project:projectId,status:'待处理'});return '邀请已发送'}
+export function respond(inv,accept){if(inv.to!==state.user||inv.status!=='待处理')return;inv.status=accept?'已接受':'已拒绝';if(accept){if(inv.project){const p=project(inv.project);if(p&&!p.members.includes(state.user))p.members.push(state.user)}else{state.friends[state.user]||=[];state.friends[inv.from]||=[];if(!state.friends[state.user].includes(inv.from))state.friends[state.user].push(inv.from);if(!state.friends[inv.from].includes(state.user))state.friends[inv.from].push(state.user)}}}

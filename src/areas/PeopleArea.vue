@@ -1,0 +1,10 @@
+<script setup>
+import {ref,computed} from 'vue';
+import {state,profile,displayName,invite,respond,project} from '../store.js';
+const emit=defineEmits(['notify']);
+const search=ref('');const chosen=ref('');
+const owned=computed(()=>state.projects.filter(p=>p.owner===state.user));
+const users=computed(()=>state.users.filter(u=>u!==state.user&&(displayName(u).includes(search.value)||u.includes(search.value))));
+function send(u,id){emit('notify',invite(u,id?Number(id):null))}
+</script>
+<template><section class="messages"><div class="section-title"><h2>好友与项目邀请</h2><input v-model="search" placeholder="搜索姓名或昵称"></div><p class="muted">先发送好友申请；项目邀请需对方接受后才加入。可切换演示身份处理邀请。</p><article v-for="u in users" :key="u" class="message"><span class="avatar"><img v-if="profile(u).avatar" :src="profile(u).avatar"><template v-else>{{ displayName(u)[0] }}</template></span><div><b>{{ displayName(u) }}</b><p class="muted">{{ profile(u).bio||'还没有填写个性签名' }}</p><small>演示账号：{{ u }}</small></div><button v-if="!(state.friends[state.user]||[]).includes(u)" class="secondary" @click="send(u,null)">添加好友</button><span v-else class="badge">好友</span><select :value="''" aria-label="邀请参加项目" @change="send(u,$event.target.value);$event.target.value='' "><option value="" disabled>邀请加入项目</option><option v-for="p in owned.filter(p=>!p.members.includes(u))" :key="p.id" :value="p.id">{{ p.name }}</option></select></article><h3>收到的邀请</h3><article v-for="i in state.invites.filter(i=>i.to===state.user)" :key="i.id" class="message"><div><b>{{ displayName(i.from) }}</b><p>{{ i.project?'邀请你加入「'+(project(i.project)?.name||'已删除项目')+'」':'申请添加你为好友' }}</p><span class="badge">{{ i.status }}</span></div><template v-if="i.status==='待处理'"><button class="primary" @click="respond(i,true)">接受</button><button class="secondary" @click="respond(i,false)">拒绝</button></template></article><h3>我发出的邀请</h3><p v-for="i in state.invites.filter(i=>i.from===state.user)" :key="i.id">{{ displayName(i.to) }} · {{ i.project?project(i.project)?.name:'好友申请' }} · {{ i.status }}</p></section></template>

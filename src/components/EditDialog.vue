@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, computed } from 'vue';
-import { state, project } from '../store.js';
+import { state, project, load } from '../store.js';
 const props=defineProps({kind:String,item:Object,projectId:Number});
 const emit=defineEmits(['close','saved']);
 const draft=reactive(props.item?JSON.parse(JSON.stringify(props.item)):{name:'',description:'',note:'',start:new Date().toLocaleDateString('sv-SE'),end:'',members:[state.user],people:[],priority:'普通',progress:0});
@@ -17,8 +17,8 @@ function save(){if(!draft.name.trim())return error.value='请填写名称';if(!d
     <label>名称 *<input v-model="draft.name" maxlength="60" placeholder="给它一个清晰的名字"></label>
     <label>说明<textarea v-if="isProject" v-model="draft.description"></textarea><textarea v-else v-model="draft.note"></textarea></label>
     <div class="dates"><label>开始日期 *<input v-model="draft.start" type="date"></label><label>截止日期 *<input v-model="draft.end" type="date"></label></div>
-    <label>{{ isProject?'项目成员':'任务负责人 *' }}</label><div class="checks"><label v-for="u in options" :key="u"><input v-model="people" type="checkbox" :value="u" :disabled="isProject&&u===(item?.owner||state.user)">{{ u }}</label></div>
-    <label v-if="!isProject">重要程度<select v-model="draft.priority"><option>普通</option><option>重要</option></select></label><p class="red" role="alert">{{ error }}</p>
+    <label>{{ isProject?'项目成员':'任务负责人 *' }}</label><div class="checks"><label v-for="u in options" :key="u"><input v-model="people" type="checkbox" :value="u" :disabled="isProject&&u===(item?.owner||state.user)">{{ u }}<small v-if="!isProject" class="muted">待办 {{ load(u) }} 项{{ load(u)>=3?' · 较忙':'' }}</small></label></div>
+    <label v-if="!isProject">重要程度<select v-model="draft.priority"><option>普通</option><option>重要</option><option>紧急</option></select></label><p class="red" role="alert">{{ error }}</p>
     <div class="actions end"><button type="button" class="secondary" @click="cancel">取消</button><button class="primary">保存</button></div>
   </form></div>
 </template>
