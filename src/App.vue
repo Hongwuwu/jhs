@@ -1,0 +1,48 @@
+<script setup>
+import { ref, computed } from 'vue';
+import { state, reset, visible, canEdit } from './store.js';
+import WorkspaceArea from './areas/WorkspaceArea.vue';
+import ProjectsArea from './areas/ProjectsArea.vue';
+import MessagesArea from './areas/MessagesArea.vue';
+import TaskDetail from './components/TaskDetail.vue';
+import EditDialog from './components/EditDialog.vue';
+// ref 保存会变化的页面状态。JS 中使用 .value，template 中直接使用变量名。
+const page=ref('workspace');
+const projects=computed(()=>state.projects.filter(p=>p.owner===state.user||p.members.includes(state.user)));
+const selected=ref(projects.value[0]?.id);
+const detail=ref(null);
+const editor=ref(null);
+const toast=ref('');let timer;
+const titles={workspace:'工作台',projects:'项目空间',messages:'消息中心'};
+const unread=computed(()=>state.messages.some(m=>m.to.includes(state.user)&&!m.read));
+function notify(text){toast.value=text;clearTimeout(timer);timer=setTimeout(()=>toast.value='',2600)}
+function selectProject(id){selected.value=id;page.value='projects'}
+function switchUser(){selected.value=projects.value[0]?.id;detail.value=null;editor.value=null}
+function openEditor(kind,item=null){if(kind==='task'&&item)selected.value=item.project;editor.value={kind,item}}
+function save(draft){const kind=editor.value.kind;if(kind==='project'){if(draft.id)Object.assign(state.projects.find(p=>p.id===draft.id),draft);else{draft.id=Date.now();draft.owner=state.user;state.projects.push(draft);selectProject(draft.id)}}else{if(draft.id)Object.assign(state.tasks.find(t=>t.id===draft.id),draft);else state.tasks.push({...draft,id:Date.now(),project:selected.value,assigned:new Date().toLocaleDateString('sv-SE')})}editor.value=null;notify('已保存，相关页面已同步更新')}
+function remove(task){if(canEdit(task)&&window.confirm('确定删除「'+task.name+'」及关联留言？')){state.tasks=state.tasks.filter(t=>t.id!==task.id);state.messages=state.messages.filter(m=>m.task!==task.id);detail.value=null;notify('任务已删除')}}
+function resetDemo(){if(window.confirm('重置全部演示数据？')){reset();switchUser();page.value='workspace';notify('演示数据已重置')}}
+</script>
+
+<template>
+  <!-- 全局布局由你负责；三个 area 是团队成员各自负责的组件。 -->
+  <aside>
+    <a class="brand" @click="page='workspace'">◈ <b>同频</b><small>TOGETHER</small></a>
+    <p class="nav-label">协作空间</p>
+    <button v-for="(title,key) in titles" :key="key" :class="['nav',{active:page===key}]" @click="page=key">{{ {workspace:'◫',projects:'▦',messages:'◉'}[key] }} <span>{{ title }}</span><i v-if="key==='messages'&&unread" class="dot"></i></button>
+    <div class="side-bottom"><div class="demo">交互原型 · 本地演示</div><p>每一次协作，都有回响。</p><button class="text" @click="resetDemo">↺ 重置演示数据</button></div>
+  </aside>
+  <div class="shell">
+    <header><span>协作空间 / {{ titles[page] }}</span><div class="identity"><span class="muted">演示身份</span><select v-model="state.user" aria-label="切换演示身份" @change="switchUser"><option v-for="u in state.users" :key="u">{{ u }}</option></select><span class="avatar">{{ state.user[0] }}</span></div></header>
+    <main>
+      <div class="heading"><div><p class="eyebrow">YOUR TEAM, IN SYNC</p><h1>{{ {workspace:'让协作，向前一步。',projects:'把想法，一起完成。',messages:'不错过每一次回应。'}[page] }}</h1><p class="muted">{{ page==='workspace'?state.user+'，欢迎回来。这里是你和团队的最新进展。':page==='projects'?'从目标到行动，让每个任务都有清晰的方向。':'任务动态与伙伴留言，都汇集在这里。' }}</p></div><button v-if="page!=='messages'" class="primary" @click="openEditor('project')">＋ 创建项目</button></div>
+      <WorkspaceArea v-if="page==='workspace'" :key="state.user" @select="selectProject" @all-projects="page='projects'" @open-task="detail=$event" />
+      <ProjectsArea v-else-if="page==='projects'" :key="state.user" :selected="selected" @select="selectProject" @edit="openEditor('project',$event)" @create-task="openEditor('task')" @open-task="detail=$event" />
+      <MessagesArea v-else @open-task="detail=$event" />
+      <footer>同频 TOGETHER · 让每一份努力，都朝着同一个方向。</footer>
+    </main>
+  </div>
+  <TaskDetail v-if="detail&&visible(detail)" :key="detail.id" :task="detail" @close="detail=null" @edit="openEditor('task',$event)" @delete="remove" @notify="notify" />
+  <EditDialog v-if="editor" :kind="editor.kind" :item="editor.item" :project-id="selected" @close="editor=null" @saved="save" />
+  <div v-if="toast" class="toast" role="status">✓ {{ toast }}</div>
+</template>
