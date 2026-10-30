@@ -19,7 +19,7 @@ const detail=ref(null);
 const editor=ref(null);
 const toast=ref('');let timer;
 const titles={workspace:'工作台',projects:'项目空间',messages:'消息中心',people:'好友与邀请'};
-const unread=computed(()=>state.messages.some(m=>m.to.includes(state.user)&&!m.read));
+const unread=computed(()=>state.messages.some(m=>m.to.includes(state.user)&&!m.read)||state.invites.some(i=>i.to===state.user&&!i.read));
 function notify(text){toast.value=text;clearTimeout(timer);timer=setTimeout(()=>toast.value='',2600)}
 function selectProject(id){selected.value=id;page.value='projects'}
 function switchUser(){selected.value=projects.value[0]?.id;detail.value=null;editor.value=null;profileOpen.value=false}
